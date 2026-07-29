@@ -82,6 +82,27 @@ class SyncEngine(private val db: AppDatabase, engineClient: HttpClient) {
         return SyncResult(pushed = local.values.sumOf { it.size }, pulled = pulled)
     }
 
+    /**
+     * Restore an "Export all data (JSON)" file. Rows go through the same last-write-wins path as a
+     * sync pull, so importing is safe to run over an existing database: newer local rows survive.
+     * Returns the number of rows actually written.
+     *
+     * Export was write-only before this — the backup file could not be loaded back, which made it
+     * useless as a backup for a reinstall.
+     */
+    suspend fun importAll(jsonText: String): Int {
+        val root = json.parseToJsonElement(jsonText) as? kotlinx.serialization.json.JsonObject
+            ?: error("not a JSON object")
+        var applied = 0
+        for ((table, el) in root) {
+            val rows = el as? kotlinx.serialization.json.JsonArray ?: continue // skips "exportedAt"
+            for (row in rows) {
+                if (runCatching { applyRemote(table, row) }.getOrDefault(false)) applied++
+            }
+        }
+        return applied
+    }
+
     private suspend fun applyRemote(table: String, el: JsonElement): Boolean {
         val s = db.syncDao()
         return when (table) {
@@ -132,6 +153,11 @@ class SyncEngine(private val db: AppDatabase, engineClient: HttpClient) {
             "RoutineExercise" -> {
                 val row = json.decodeFromJsonElement(dev.dwm.liftlog.data.db.RoutineExercise.serializer(), el)
                 if ((s.routineExerciseUpdatedAt(row.id) ?: -1) < row.updatedAt) { s.upsertRoutineExercise(row); true } else false
+            }
+            // reachable only from importAll — Setting is deliberately not in the sync payload
+            "Setting" -> {
+                val row = json.decodeFromJsonElement(Setting.serializer(), el)
+                if ((s.settingUpdatedAt(row.key) ?: -1) < row.updatedAt) { s.upsertSetting(row); true } else false
             }
             else -> false
         }

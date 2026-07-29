@@ -74,6 +74,7 @@ fun App(
     db: AppDatabase,
     scanBarcode: (suspend () -> String?)? = null,
     saveExport: (suspend (String) -> String)? = null,
+    loadImport: (suspend () -> String?)? = null,
     takePhoto: (suspend () -> CapturedPhoto?)? = null,
     voiceInput: (suspend () -> String?)? = null,
     uiScale: Float? = null,
@@ -143,7 +144,7 @@ fun App(
                 )
                 Tab.Nutrition -> NutritionScreen(db, off, modifier, scanBarcode, takePhoto)
                 Tab.History -> HistoryScreen(db, modifier)
-                Tab.Settings -> SettingsScreen(db, modifier, saveExport, uiScale, onUiScale)
+                Tab.Settings -> SettingsScreen(db, modifier, saveExport, loadImport, uiScale, onUiScale)
             }
         }
 

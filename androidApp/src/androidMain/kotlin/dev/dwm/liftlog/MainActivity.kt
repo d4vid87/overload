@@ -29,6 +29,14 @@ class MainActivity : ComponentActivity() {
     private val requestNotifications =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
+    private var importContinuation: ((android.net.Uri?) -> Unit)? = null
+
+    private val pickImport =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            importContinuation?.invoke(uri)
+            importContinuation = null
+        }
+
     private var speechContinuation: ((String?) -> Unit)? = null
 
     private val recognizeSpeech =
@@ -89,6 +97,20 @@ class MainActivity : ComponentActivity() {
                     val file = java.io.File(getExternalFilesDir(null), "liftlog-export-${System.currentTimeMillis()}.json")
                     file.writeText(content)
                     file.absolutePath
+                },
+                loadImport = {
+                    val uri = suspendCancellableCoroutine<android.net.Uri?> { cont ->
+                        importContinuation = { cont.resume(it) }
+                        // */* not application/json: exports land in app-private storage and some
+                        // pickers won't surface .json files under a narrow MIME filter
+                        runCatching { pickImport.launch(arrayOf("*/*")) }.onFailure {
+                            importContinuation = null
+                            cont.resume(null)
+                        }
+                    }
+                    uri?.let {
+                        contentResolver.openInputStream(it)?.bufferedReader()?.use { r -> r.readText() }
+                    }
                 },
                 takePhoto = {
                     val file = java.io.File(cacheDir, "meal-photo.jpg")

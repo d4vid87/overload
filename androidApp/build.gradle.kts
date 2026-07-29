@@ -27,8 +27,8 @@ android {
         applicationId = "dev.dwm.liftlog"
         minSdk = 31
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.9.3"
+        versionCode = 13
+        versionName = "0.9.4"
     }
     buildTypes {
         release {

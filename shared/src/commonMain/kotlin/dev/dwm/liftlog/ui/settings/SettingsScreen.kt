@@ -42,6 +42,8 @@ fun SettingsScreen(
     db: AppDatabase,
     modifier: Modifier = Modifier,
     saveExport: (suspend (String) -> String)? = null,
+    /** Picks a previously exported JSON file and returns its text. */
+    loadImport: (suspend () -> String?)? = null,
     uiScale: Float? = null,
     onUiScale: ((Float) -> Unit)? = null,
 ) {
@@ -259,6 +261,23 @@ fun SettingsScreen(
                                 .getOrElse { "Export failed: ${it.message}" }
                         }
                     }) { Text("Export all data (JSON)") }
+                    Text(
+                        "The export contains your AI key and sync token — keep the file private.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (loadImport != null) {
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                status = runCatching {
+                                    val text = loadImport() ?: return@runCatching "Import cancelled"
+                                    val n = dev.dwm.liftlog.data.SyncEngine(db, dev.dwm.liftlog.data.httpClient())
+                                        .importAll(text)
+                                    "Imported $n rows — restart the app to see everything"
+                                }.getOrElse { "Import failed: ${it.message}" }
+                            }
+                        }) { Text("Restore from backup (JSON)") }
+                    }
                 }
             }
         }
@@ -292,6 +311,8 @@ private suspend fun exportJson(db: AppDatabase): String {
         put("GroceryItem", enc(dev.dwm.liftlog.data.db.GroceryItem.serializer(), s.groceriesSince(0)))
         put("Routine", enc(dev.dwm.liftlog.data.db.Routine.serializer(), s.routinesSince(0)))
         put("RoutineExercise", enc(dev.dwm.liftlog.data.db.RoutineExercise.serializer(), s.routineExercisesSince(0)))
+        // includes the AI key and sync token — this file is a full credential-bearing backup
+        put("Setting", enc(dev.dwm.liftlog.data.db.Setting.serializer(), s.settingsSince(0)))
     }
     return json.encodeToString(JsonElement.serializer(), obj)
 }

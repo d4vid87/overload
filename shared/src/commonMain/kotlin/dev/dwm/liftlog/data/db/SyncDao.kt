@@ -115,4 +115,15 @@ interface SyncDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertWeight(row: WeightEntry)
+
+    // Settings were left out of backup entirely, so a reinstall lost the AI key, macro targets,
+    // goal and rest prefs. Local-only on purpose: not part of the sync payload, just export/import.
+    @Query("SELECT * FROM Setting WHERE updatedAt > :since")
+    suspend fun settingsSince(since: Long): List<Setting>
+
+    @Query("SELECT updatedAt FROM Setting WHERE key = :key")
+    suspend fun settingUpdatedAt(key: String): Long?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSetting(row: Setting)
 }

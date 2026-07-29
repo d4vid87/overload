@@ -65,6 +65,15 @@ fun main() {
                         file.writeText(content)
                         file.absolutePath
                     },
+                    loadImport = {
+                        // ponytail: Swing chooser — no extra dependency for a rarely used restore
+                        val chooser = javax.swing.JFileChooser(System.getProperty("user.home")).apply {
+                            dialogTitle = "Choose an Overload backup (.json)"
+                        }
+                        if (chooser.showOpenDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) {
+                            chooser.selectedFile?.readText()
+                        } else null
+                    },
                     uiScale = scale,
                     onUiScale = ::setScale,
                 )
