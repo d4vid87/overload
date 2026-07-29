@@ -18,6 +18,9 @@ data class Food(
     val fat: Double,
     val microsJson: String? = null,
     val imageUrl: String? = null,
+    /** One serving in grams, and how the label words it ("1 tbsp", "1 scoop"). From Open Food Facts. */
+    val servingGrams: Double? = null,
+    val servingLabel: String? = null,
     val custom: Boolean = false,
     val updatedAt: Long = nowMillis(),
     val deletedAt: Long? = null,

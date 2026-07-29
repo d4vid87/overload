@@ -405,7 +405,7 @@ fun NutritionScreen(
                             androidx.compose.material3.AssistChip(
                                 onClick = {
                                     scope.launch {
-                                        val g = db.foodLogDao().lastLogFor(food.id)?.grams ?: 100.0
+                                        val g = db.foodLogDao().lastLogFor(food.id)?.grams ?: food.defaultPortion
                                         db.foodLogDao().insert(FoodLog(epochDay = day, foodId = food.id, grams = g, meal = meal))
                                     }
                                 },
@@ -680,6 +680,13 @@ private fun WeeklyMacroCard(week: List<DailyMacro>, today: Long, targetKcal: Dou
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (week.none { it.kcal > 0 }) {
+                Text(
+                    "No food logged this week — log a meal and your macro split shows up here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Row(
                 Modifier.fillMaxWidth().height(140.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -778,7 +785,11 @@ private fun LogFoodsDialog(
         onLogParsed(parsed, uri); lastAdded = "${parsed.size} item${if (parsed.size > 1) "s" else ""}"; addedCount += parsed.size
     }
 
-    dev.dwm.liftlog.ui.components.FullScreenDialog("Log Foods", onDismiss) {
+    dev.dwm.liftlog.ui.components.FullScreenDialog(
+        "Log Foods",
+        onDismiss,
+        dismissLabel = if (addedCount > 0) "Done" else "Cancel",
+    ) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -790,7 +801,7 @@ private fun LogFoodsDialog(
             }
             if (addedCount > 0) {
                 Text(
-                    "✓ Added $lastAdded  ·  $addedCount logged — tap ✕ when done",
+                    "✓ Added $lastAdded  ·  $addedCount logged — tap Done when finished",
                     style = MaterialTheme.typography.bodySmall,
                     color = Palette.Success,
                 )
@@ -841,6 +852,26 @@ private fun FoodResultRow(food: Food, onPlus: () -> Unit) {
     }
 }
 
+/**
+ * Grams to log when the user didn't type an amount: the product's real serving if we know it, else
+ * 100 g. 100 g was a terrible default for anything calorie-dense — one tap logged 100 g of Nutella.
+ */
+private val Food.defaultPortion: Double get() = servingGrams ?: 100.0
+
+/**
+ * Open Food Facts carries one row per barcode, so a search for "nutella" comes back as a dozen
+ * identical-looking jars. Collapse to one row per name+brand+macros, keeping the first hit that has
+ * a photo so the list still shows product images.
+ */
+private fun List<Food>.dedupeProducts(): List<Food> =
+    groupBy {
+        listOf(
+            it.name.trim().lowercase(),
+            it.brand.trim().lowercase(),
+            it.kcal.toInt(), it.protein.toInt(), it.fat.toInt(), it.carbs.toInt(),
+        )
+    }.values.map { dupes -> dupes.firstOrNull { it.imageUrl != null } ?: dupes.first() }
+
 @Composable
 private fun SearchTab(
     db: AppDatabase,
@@ -866,7 +897,9 @@ private fun SearchTab(
         results = local
         kotlinx.coroutines.delay(350)
         searching = true
-        val remote = off.search(query).filter { r -> local.none { it.barcode != null && it.barcode == r.barcode } }
+        val remote = off.search(query)
+            .filter { r -> local.none { it.barcode != null && it.barcode == r.barcode } }
+            .dedupeProducts()
         searching = false
         if (remote.isNotEmpty()) results = local + remote
     }
@@ -886,7 +919,7 @@ private fun SearchTab(
                     val local = db.foodDao().search(query)
                     results = local + off.search(query).filter { remote ->
                         local.none { it.barcode != null && it.barcode == remote.barcode }
-                    }
+                    }.dedupeProducts()
                     searching = false
                 }
             }, enabled = query.isNotBlank()) { Text("Web") }
@@ -899,11 +932,11 @@ private fun SearchTab(
         LazyColumn(Modifier.weight(1f)) {
             items(results, key = { it.id }) { food ->
                 FoodResultRow(food) {
-                    // + logs instantly: explicit grams > last-used portion > 100g
+                    // + logs instantly: explicit grams > last-used portion > one serving
                     scope.launch {
                         val g = grams.toDoubleOrNull()
                             ?: db.foodLogDao().lastLogFor(food.id)?.grams
-                            ?: 100.0
+                            ?: food.defaultPortion
                         onAdd(food, g)
                     }
                 }
@@ -945,7 +978,7 @@ private fun ScanTab(
         }, modifier = Modifier.fillMaxWidth()) { Text("Scan Barcode") }
         GramsField(grams, onGrams)
         if (searching) CircularProgressIndicator()
-        found?.let { food -> FoodResultRow(food) { onAdd(food, grams.toDoubleOrNull() ?: 100.0) } }
+        found?.let { food -> FoodResultRow(food) { onAdd(food, grams.toDoubleOrNull() ?: food.defaultPortion) } }
         missedBarcode?.let { code ->
             Text("Barcode $code not found — create it:", style = MaterialTheme.typography.bodySmall)
             OutlinedTextField(newName, { newName = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())

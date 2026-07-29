@@ -12,6 +12,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -21,6 +22,11 @@ private data class OffProduct(
     @SerialName("product_name") val productName: String? = null,
     val brands: String? = null,
     @SerialName("image_front_small_url") val imageFrontSmallUrl: String? = null,
+    // serving_quantity is grams, but OFF returns it as a number for some products and a string for
+    // others — JsonPrimitive tolerates both. Typing it String? made those products fail to
+    // deserialize, which took the whole search result down with it.
+    @SerialName("serving_quantity") val servingQuantity: JsonPrimitive? = null,
+    @SerialName("serving_size") val servingSize: String? = null,
     val nutriments: JsonObject? = null,
 )
 
@@ -57,6 +63,9 @@ class OpenFoodFacts(engineClient: HttpClient) {
             fat = nutrient("fat") ?: 0.0,
             microsJson = if (micros.isEmpty()) null else "{${micros.joinToString(",")}}",
             imageUrl = imageFrontSmallUrl?.takeIf { it.isNotBlank() },
+            // ignore nonsense servings (0g, or a "serving" bigger than a kilo)
+            servingGrams = servingQuantity?.content?.trim()?.toDoubleOrNull()?.takeIf { it > 0 && it <= 1000 },
+            servingLabel = servingSize?.trim()?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -68,7 +77,7 @@ class OpenFoodFacts(engineClient: HttpClient) {
             parameter("action", "process")
             parameter("json", 1)
             parameter("page_size", 20)
-            parameter("fields", "code,product_name,brands,image_front_small_url,nutriments")
+            parameter("fields", "code,product_name,brands,image_front_small_url,serving_quantity,serving_size,nutriments")
         }.body<OffSearch>().products.mapNotNull { it.toFood() }
     }.getOrDefault(emptyList())
 

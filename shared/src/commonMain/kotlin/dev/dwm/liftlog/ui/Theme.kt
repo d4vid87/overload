@@ -1,9 +1,11 @@
 package dev.dwm.liftlog.ui
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -33,6 +35,7 @@ private val Scheme = darkColorScheme(
     surfaceContainerHigh = Color(0xFF1C2536),
     onSurface = Color(0xFFE9EDF5),
     onSurfaceVariant = Color(0xFF93A0B4),
+    onBackground = Color(0xFFE9EDF5),
     outline = Color(0xFF2E3A50),
 )
 
@@ -54,5 +57,10 @@ private val OverloadTypography = Typography().run {
 
 @Composable
 fun LiftLogTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Scheme, typography = OverloadTypography, content = content)
+    MaterialTheme(colorScheme = Scheme, typography = OverloadTypography) {
+        // Scaffold/Box use containerColor=Transparent, and contentColorFor(Transparent) is
+        // Unspecified — which Text renders as BLACK on our dark background. Every heading outside
+        // a Card was invisible until this. Cards override it themselves with onSurface.
+        CompositionLocalProvider(LocalContentColor provides Scheme.onBackground, content = content)
+    }
 }

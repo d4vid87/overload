@@ -187,7 +187,9 @@ fun DashboardScreen(
 
     Box(modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
+            // extra bottom room so the FAB doesn't sit on top of the last card
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(

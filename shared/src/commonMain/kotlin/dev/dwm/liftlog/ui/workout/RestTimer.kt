@@ -45,4 +45,22 @@ object RestTimer {
         over = false
         notifyRest(null)
     }
+
+    /**
+     * Restore a timer that was running when the process died. Android kills this app in the
+     * background (seen as LOW_MEMORY in exit-info), which used to silently drop the rest timer and
+     * strand its ongoing notification. `endsAt` is an absolute wall-clock time, so a stale value is
+     * simply already expired.
+     */
+    fun restore(savedEndsAt: Long, savedDurationMs: Long) {
+        if (endsAt != null) return // a live timer always wins over a persisted one
+        if (savedEndsAt <= nowMillis()) {
+            notifyRest(null) // already elapsed while we were dead — just clear the stale notification
+            return
+        }
+        durationMs = savedDurationMs.coerceAtLeast(1000L)
+        endsAt = savedEndsAt
+        over = false
+        notifyRest(savedEndsAt)
+    }
 }

@@ -861,7 +861,13 @@ fun ActiveWorkoutScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             val grouped = sets.groupBy { it.exerciseId }
-            items(grouped.keys.toList(), key = { it }) { exerciseId ->
+            // Cards follow the routine's order. The sets query orders by updatedAt, so completing a
+            // set used to bump that exercise to the BOTTOM of the list mid-workout. Ad-hoc
+            // exercises have no routine position — they sort last, stably by id.
+            val order = grouped.keys.sortedWith(
+                compareBy({ routineMeta[it]?.position ?: Int.MAX_VALUE }, { it }),
+            )
+            items(order, key = { it }) { exerciseId ->
                 ExerciseCard(
                     exercise = exercises[exerciseId],
                     sets = grouped[exerciseId].orEmpty(),
@@ -1006,7 +1012,24 @@ private fun WorkoutHeader(workout: Workout, onFinish: () -> Unit, onDiscard: () 
                 )
             }
         }
-        TextButton(onClick = onDiscard) { Text("Discard", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        // confirm first — Discard sits right next to Finish and throws away the whole session
+        var confirmDiscard by remember { mutableStateOf(false) }
+        if (confirmDiscard) {
+            AlertDialog(
+                onDismissRequest = { confirmDiscard = false },
+                title = { Text("Discard workout?") },
+                text = { Text("Every set you logged in this session is deleted. This can't be undone.") },
+                confirmButton = {
+                    TextButton(onClick = { confirmDiscard = false; onDiscard() }) {
+                        Text("Discard", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep training") } },
+            )
+        }
+        TextButton(onClick = { confirmDiscard = true }) {
+            Text("Discard", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Box(
             Modifier
                 .background(

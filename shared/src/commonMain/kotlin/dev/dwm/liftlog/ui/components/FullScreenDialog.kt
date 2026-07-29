@@ -28,6 +28,8 @@ fun FullScreenDialog(
     actionLabel: String? = null,
     actionEnabled: Boolean = true,
     onAction: (() -> Unit)? = null,
+    /** Label for the leading button. "Cancel" reads like an undo once things have been logged. */
+    dismissLabel: String = "Cancel",
     content: @Composable () -> Unit,
 ) {
     Dialog(
@@ -44,7 +46,7 @@ fun FullScreenDialog(
                     Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = onDismiss) { Text(dismissLabel) }
                     Text(
                         title,
                         Modifier.weight(1f),

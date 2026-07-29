@@ -85,9 +85,12 @@ actual fun playTone(t: Tone) {
     val buf = toneBuffers[t] ?: return
     runCatching {
         val track = android.media.AudioTrack(
+            // USAGE_MEDIA, not SONIFICATION: sonification follows the ringer, so on silent/vibrate
+            // the system muted every tempo note ("OpPlayAudio ... usage:13 muted" in logcat) and
+            // the metronome was completely inaudible. Media volume is what metronome apps use.
             android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build(),
             android.media.AudioFormat.Builder()
                 .setSampleRate(TONE_SR)
@@ -158,6 +161,19 @@ private fun ensureChannel(m: NotificationManager) {
     )
 }
 
+/**
+ * Tapping the rest notification must reopen the app. Without this the ongoing notification sat in
+ * the tray doing nothing — and if the process was killed it couldn't even be dismissed.
+ */
+private fun openAppIntent(ctx: Context): android.app.PendingIntent? = runCatching {
+    val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+        ?.addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+    android.app.PendingIntent.getActivity(
+        ctx, 0, intent,
+        android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+    )
+}.getOrNull()
+
 actual fun notifyRest(endsAt: Long?) {
     val ctx = appContext ?: return
     val m = manager() ?: return
@@ -176,6 +192,7 @@ actual fun notifyRest(endsAt: Long?) {
             .setWhen(endsAt)
             .setOngoing(true)
             .setSilent(true)
+            .setContentIntent(openAppIntent(ctx))
             .build()
         m.notify(NOTIF_ID, n)
     }
@@ -192,6 +209,7 @@ actual fun notifyRestOver() {
             .setContentText("Next set time")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
+            .setContentIntent(openAppIntent(ctx))
             .build()
         m.notify(NOTIF_ID, n)
     }

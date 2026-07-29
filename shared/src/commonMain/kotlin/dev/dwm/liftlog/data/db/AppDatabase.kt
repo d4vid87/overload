@@ -30,6 +30,14 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+// v9: real serving sizes so foods don't all default to 100g — additive
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE Food ADD COLUMN servingGrams REAL")
+        connection.execSQL("ALTER TABLE Food ADD COLUMN servingLabel TEXT")
+    }
+}
+
 @Database(
     entities = [
         Exercise::class, Workout::class, WorkoutSet::class,
@@ -37,7 +45,7 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         Food::class, FoodLog::class, WeightEntry::class, Setting::class,
         GroceryItem::class, Routine::class, RoutineExercise::class,
     ],
-    version = 8,
+    version = 9,
 )
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {

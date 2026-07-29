@@ -88,7 +88,19 @@ fun App(
     LaunchedEffect(Unit) {
         seedExercisesIfEmpty(db)
         onboarded = db.settingDao().get("onboarded") == "1"
+        // a rest timer running when Android killed the app is resumed here, not lost
+        val savedEnd = db.settingDao().get("restEndsAt")?.toLongOrNull()
+        if (savedEnd != null) {
+            RestTimer.restore(savedEnd, db.settingDao().get("restDurationMs")?.toLongOrNull() ?: 90_000L)
+        }
         dev.dwm.liftlog.data.autoSync(db) // pull other devices' changes on open
+    }
+    LaunchedEffect(RestTimer.endsAt) {
+        val e = RestTimer.endsAt
+        db.settingDao().put(dev.dwm.liftlog.data.db.Setting("restEndsAt", e?.toString() ?: ""))
+        if (e != null) {
+            db.settingDao().put(dev.dwm.liftlog.data.db.Setting("restDurationMs", RestTimer.durationMs.toString()))
+        }
     }
     // never let the screen lock while a workout or rest timer is live
     LaunchedEffect(dev.dwm.liftlog.ui.workout.WorkoutSession.active, RestTimer.endsAt) {
