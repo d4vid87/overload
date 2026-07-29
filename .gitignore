@@ -10,3 +10,7 @@ captures/
 # Local Netlify folder
 .netlify
 node_modules/
+
+# release signing material lives outside the repo (~/liftlog-keystore), never commit it
+*.jks
+*.keystore

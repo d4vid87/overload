@@ -14,7 +14,26 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      # Sign with the stable release key. Without it every run would sign with a
+      # throwaway debug key and the APK could not update the previous install.
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing — refusing to publish a debug-signed release."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/overload-release.jks"
       - run: ./gradlew :androidApp:assembleRelease
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/overload-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/overload-release.jks"
       - uses: softprops/action-gh-release@v2
         with:
           files: androidApp/build/outputs/apk/release/*.apk

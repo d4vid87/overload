@@ -27,14 +27,44 @@ android {
         applicationId = "dev.dwm.liftlog"
         minSdk = 31
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.9.4"
+        versionCode = 14
+        versionName = "0.9.5"
     }
+    // Stable release key. Previously `release` reused signingConfigs.debug, and CI generates a
+    // fresh debug keystore on every run — so each release was signed with a DIFFERENT key, no
+    // update could install over the previous one, and every upgrade meant uninstall + data loss.
+    // Keystore comes from CI secrets (or ~/liftlog-keystore locally); absent, we fall back to debug.
+    val keystoreFile = (findProperty("overload.keystore") as String?)
+        ?: System.getenv("ANDROID_KEYSTORE_FILE")
+    val keystorePassword = (findProperty("overload.keystorePassword") as String?)
+        ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val keyAlias0 = (findProperty("overload.keyAlias") as String?)
+        ?: System.getenv("ANDROID_KEY_ALIAS")
+    val keyPassword0 = (findProperty("overload.keyPassword") as String?)
+        ?: System.getenv("ANDROID_KEY_PASSWORD")
+    val hasReleaseKey = keystoreFile != null && file(keystoreFile).exists() &&
+        keystorePassword != null && keyAlias0 != null && keyPassword0 != null
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(keystoreFile!!)
+                storePassword = keystorePassword
+                keyAlias = keyAlias0
+                keyPassword = keyPassword0
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // ponytail: debug-signed release, fine for sideloading; real keystore if ever distributed
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKey) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.warn("No release keystore found — signing with the debug key. This APK will NOT install over a properly signed release.")
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
