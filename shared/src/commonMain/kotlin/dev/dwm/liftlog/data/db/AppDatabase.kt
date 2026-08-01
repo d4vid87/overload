@@ -38,14 +38,31 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+// v10: rest-day cardio logging — new table, existing data untouched
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            """CREATE TABLE IF NOT EXISTS Cardio (
+                 id TEXT NOT NULL PRIMARY KEY,
+                 startedAt INTEGER NOT NULL,
+                 minutes INTEGER NOT NULL,
+                 kind TEXT NOT NULL,
+                 updatedAt INTEGER NOT NULL,
+                 deletedAt INTEGER
+               )"""
+        )
+    }
+}
+
 @Database(
     entities = [
         Exercise::class, Workout::class, WorkoutSet::class,
         Program::class, ProgramDay::class, ProgramExercise::class,
         Food::class, FoodLog::class, WeightEntry::class, Setting::class,
         GroceryItem::class, Routine::class, RoutineExercise::class,
+        Cardio::class,
     ],
-    version = 9,
+    version = 10,
 )
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -58,6 +75,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun settingDao(): SettingDao
     abstract fun groceryDao(): GroceryDao
     abstract fun routineDao(): RoutineDao
+    abstract fun cardioDao(): CardioDao
     abstract fun syncDao(): SyncDao
 }
 

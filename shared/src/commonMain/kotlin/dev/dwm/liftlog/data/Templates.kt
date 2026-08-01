@@ -244,8 +244,9 @@ val templates = listOf(
 
 /** Instantiate a template into DB rows. Exercises resolved by name, created if missing. */
 suspend fun installTemplate(db: AppDatabase, template: Template): Program {
+    // days go in first: the programs Flow emits as soon as the Program row lands, and a card that
+    // renders before its days exist shows "Day 1 of 1" until something else invalidates it
     val program = Program(name = template.name)
-    db.programDao().insertProgram(program)
     template.days.forEachIndexed { dayIndex, day ->
         val programDay = ProgramDay(programId = program.id, dayIndex = dayIndex, name = day.name)
         db.programDao().insertDay(programDay)
@@ -270,5 +271,6 @@ suspend fun installTemplate(db: AppDatabase, template: Template): Program {
             )
         }
     }
+    db.programDao().insertProgram(program)
     return program
 }

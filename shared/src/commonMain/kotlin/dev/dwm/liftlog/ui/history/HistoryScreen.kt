@@ -88,11 +88,43 @@ private data class WorkoutStats(
 @Composable
 private fun WorkoutList(db: AppDatabase) {
     val workouts by remember { db.workoutDao().history() }.collectAsStateList()
+    val cardio by remember { db.cardioDao().all() }.collectAsStateList()
+    // one timeline: lifting sessions and cardio, newest first
+    val entries = remember(workouts, cardio) {
+        (workouts.map { it.startedAt to (it as Any) } + cardio.map { it.startedAt to (it as Any) })
+            .sortedByDescending { it.first }
+    }
     LazyColumn(
         Modifier.padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        items(workouts, key = { it.id }) { workout -> WorkoutCard(db, workout) }
+        items(
+            entries,
+            key = { (_, e) -> if (e is Workout) e.id else (e as dev.dwm.liftlog.data.db.Cardio).id },
+        ) { (_, e) ->
+            when (e) {
+                is Workout -> WorkoutCard(db, e)
+                is dev.dwm.liftlog.data.db.Cardio -> CardioCard(e)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardioCard(cardio: dev.dwm.liftlog.data.db.Cardio) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "🏃 ${cardio.minutes} min ${cardio.kind}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                formatDate(cardio.startedAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

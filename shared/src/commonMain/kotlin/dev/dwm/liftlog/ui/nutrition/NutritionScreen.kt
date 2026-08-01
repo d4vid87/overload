@@ -1024,6 +1024,18 @@ private fun AiTab(
     var error by remember { mutableStateOf("") }
     var parsed by remember { mutableStateOf<List<ParsedFood>>(emptyList()) }
     var photoUri by remember { mutableStateOf<String?>(null) }
+    // Bulk/Cut/Maintain, APS-style: same targets nudged ±300 kcal
+    var planGoal by remember { mutableStateOf("Maintain") }
+    var targets by remember { mutableStateOf(Triple(2000.0, 30.0, 30.0)) }
+    LaunchedEffect(Unit) {
+        val kcal = db.settingDao().get("lastTargetKcal")?.toDoubleOrNull()
+            ?: db.settingDao().get("targetKcal")?.toDoubleOrNull() ?: 2000.0
+        targets = Triple(
+            kcal,
+            db.settingDao().get("proteinPct")?.toDoubleOrNull() ?: 30.0,
+            db.settingDao().get("fatPct")?.toDoubleOrNull() ?: 30.0,
+        )
+    }
 
     suspend fun runParse(imageB64: String?) {
         busy = true; error = ""
@@ -1059,6 +1071,39 @@ private fun AiTab(
                 }, enabled = !busy) { Text("Snap Photo") }
             }
         }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            listOf("Bulk", "Cut", "Maintain").forEach { g ->
+                FilterChip(selected = planGoal == g, onClick = { planGoal = g }, label = { Text(g) })
+            }
+        }
+        Button(onClick = {
+            scope.launch {
+                busy = true; error = ""; photoUri = null
+                val (baseKcal, proteinPct, fatPct) = targets
+                val kcal = baseKcal + when (planGoal) {
+                    "Bulk" -> 300.0
+                    "Cut" -> -300.0
+                    else -> 0.0
+                }
+                val ai = dev.dwm.liftlog.data.aiClient(db).getOrElse {
+                    error = it.message ?: "AI not configured"; busy = false; return@launch
+                }
+                parsed = runCatching {
+                    ai.mealPlan(
+                        planGoal,
+                        kcal,
+                        kcal * proteinPct / 100 / 4,
+                        kcal * (100 - proteinPct - fatPct).coerceAtLeast(0.0) / 100 / 4,
+                        kcal * fatPct / 100 / 9,
+                    )
+                }.getOrElse { error = it.message ?: "failed"; emptyList() }
+                if (parsed.isEmpty() && error.isBlank()) error = "Nothing planned"
+                busy = false
+            }
+        }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Plan my day (AI)") }
         if (busy) CircularProgressIndicator()
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
         parsed.forEach {

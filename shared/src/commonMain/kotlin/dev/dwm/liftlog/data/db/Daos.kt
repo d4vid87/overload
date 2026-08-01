@@ -25,6 +25,9 @@ interface ExerciseDao {
 
     @Query("SELECT * FROM Exercise WHERE deletedAt IS NULL AND name = :name COLLATE NOCASE LIMIT 1")
     suspend fun byName(name: String): Exercise?
+
+    @Query("SELECT * FROM Exercise WHERE deletedAt IS NULL ORDER BY name")
+    suspend fun allOnce(): List<Exercise>
 }
 
 @Dao
@@ -169,6 +172,21 @@ interface RoutineDao {
 
     @Query("SELECT * FROM Routine WHERE deletedAt IS NULL AND name = :name LIMIT 1")
     suspend fun byName(name: String): Routine?
+}
+
+@Dao
+interface CardioDao {
+    @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: Cardio)
+
+    @Query("UPDATE Cardio SET deletedAt = :now, updatedAt = :now WHERE id = :id")
+    suspend fun delete(id: String, now: Long = nowMillis())
+
+    @Query("SELECT * FROM Cardio WHERE deletedAt IS NULL ORDER BY startedAt DESC")
+    fun all(): Flow<List<Cardio>>
+
+    @Query("SELECT COALESCE(SUM(minutes), 0) FROM Cardio WHERE deletedAt IS NULL AND startedAt >= :from")
+    suspend fun minutesSince(from: Long): Int
 }
 
 data class E1rmPoint(val time: Long, val e1rm: Double)

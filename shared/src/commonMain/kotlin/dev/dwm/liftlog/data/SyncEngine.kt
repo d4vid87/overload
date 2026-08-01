@@ -64,6 +64,7 @@ class SyncEngine(private val db: AppDatabase, engineClient: HttpClient) {
             "GroceryItem" to s.groceriesSince(since).map { json.encodeToJsonElement(dev.dwm.liftlog.data.db.GroceryItem.serializer(), it) },
             "Routine" to s.routinesSince(since).map { json.encodeToJsonElement(dev.dwm.liftlog.data.db.Routine.serializer(), it) },
             "RoutineExercise" to s.routineExercisesSince(since).map { json.encodeToJsonElement(dev.dwm.liftlog.data.db.RoutineExercise.serializer(), it) },
+            "Cardio" to s.cardioSince(since).map { json.encodeToJsonElement(dev.dwm.liftlog.data.db.Cardio.serializer(), it) },
         ).filterValues { it.isNotEmpty() }
 
         val response: SyncResponse = client.post("${baseUrl.trimEnd('/')}/api/sync") {
@@ -153,6 +154,10 @@ class SyncEngine(private val db: AppDatabase, engineClient: HttpClient) {
             "RoutineExercise" -> {
                 val row = json.decodeFromJsonElement(dev.dwm.liftlog.data.db.RoutineExercise.serializer(), el)
                 if ((s.routineExerciseUpdatedAt(row.id) ?: -1) < row.updatedAt) { s.upsertRoutineExercise(row); true } else false
+            }
+            "Cardio" -> {
+                val row = json.decodeFromJsonElement(dev.dwm.liftlog.data.db.Cardio.serializer(), el)
+                if ((s.cardioUpdatedAt(row.id) ?: -1) < row.updatedAt) { s.upsertCardio(row); true } else false
             }
             // reachable only from importAll — Setting is deliberately not in the sync payload
             "Setting" -> {

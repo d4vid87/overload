@@ -27,8 +27,8 @@ android {
         applicationId = "dev.dwm.liftlog"
         minSdk = 31
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.9.5"
+        versionCode = 15
+        versionName = "0.10.0"
     }
     // Stable release key. Previously `release` reused signingConfigs.debug, and CI generates a
     // fresh debug keystore on every run — so each release was signed with a DIFFERENT key, no

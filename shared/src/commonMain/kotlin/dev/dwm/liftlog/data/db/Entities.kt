@@ -138,6 +138,20 @@ data class RoutineExercise(
     val deletedAt: Long? = null,
 )
 
+/** Rest-day cardio session. Duration only — no distance/pace until something actually needs them. */
+@kotlinx.serialization.Serializable
+@Entity
+data class Cardio(
+    @PrimaryKey val id: String = newId(),
+    val startedAt: Long,
+    val minutes: Int,
+    val kind: String = "walk",
+    val updatedAt: Long = nowMillis(),
+    val deletedAt: Long? = null,
+)
+
+val CARDIO_KINDS = listOf("walk", "run", "bike", "row", "other")
+
 object Rules {
     const val LINEAR = "LINEAR"
     const val DOUBLE = "DOUBLE"

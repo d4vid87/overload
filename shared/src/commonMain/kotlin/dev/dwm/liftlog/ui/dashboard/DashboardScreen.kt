@@ -166,6 +166,8 @@ fun DashboardScreen(
             val target = (targetKcal * proteinPct / 100 / 4).toInt()
             list.add("7-day protein average ${avg}g vs ${target}g target")
         }
+        val cardio7 = db.cardioDao().minutesSince(nowMillis() - 7 * dayMs)
+        if (cardio7 > 0) list.add("Cardio $cardio7 min over 7 days")
         val w7 = weights.filter { it.epochDay >= today - 7 }
         if (w7.size >= 2) {
             val d = (w7.last().kg - w7.first().kg).kgToLbDisplay()

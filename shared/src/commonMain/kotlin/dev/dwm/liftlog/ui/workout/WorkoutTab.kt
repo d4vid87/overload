@@ -42,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -65,8 +66,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.dwm.liftlog.data.AiClient
 import dev.dwm.liftlog.data.applyProgression
+import dev.dwm.liftlog.data.Goal
+import dev.dwm.liftlog.data.REST_DAY_ADVICE
+import dev.dwm.liftlog.data.generatePlan
 import dev.dwm.liftlog.data.db.AppDatabase
+import dev.dwm.liftlog.data.db.CARDIO_KINDS
+import dev.dwm.liftlog.data.db.Cardio
 import dev.dwm.liftlog.data.db.Exercise
+import dev.dwm.liftlog.data.db.Setting
 import dev.dwm.liftlog.data.db.Program
 import dev.dwm.liftlog.data.db.ProgramDay
 import dev.dwm.liftlog.data.db.Routine
@@ -79,8 +86,10 @@ import dev.dwm.liftlog.data.installTemplate
 import dev.dwm.liftlog.data.startProgramWorkout
 import dev.dwm.liftlog.data.startRoutineWorkout
 import dev.dwm.liftlog.data.templates
+import dev.dwm.liftlog.domain.Kit
 import dev.dwm.liftlog.domain.Muscle
 import dev.dwm.liftlog.domain.MuscleReadiness
+import dev.dwm.liftlog.domain.swapCandidates
 import dev.dwm.liftlog.domain.musclesFor
 import dev.dwm.liftlog.domain.readiness
 import dev.dwm.liftlog.domain.e1rm
@@ -93,6 +102,8 @@ import dev.dwm.liftlog.ui.Haptic
 import dev.dwm.liftlog.ui.Palette
 import dev.dwm.liftlog.ui.Tone
 import dev.dwm.liftlog.ui.collectAsStateList
+import dev.dwm.liftlog.ui.demoVideoUrl
+import dev.dwm.liftlog.ui.openUrl
 import dev.dwm.liftlog.ui.haptic
 import dev.dwm.liftlog.ui.playBeep
 import dev.dwm.liftlog.ui.playTone
@@ -254,6 +265,7 @@ private fun StartScreen(db: AppDatabase, modifier: Modifier, onStarted: (Workout
             }
         }
         item { ProgramsSection(db, startChecked, onStarted) }
+        item { CardioSection(db) }
         item {
             // recovery strip: amber chips for muscles still resting; tap → full guide
             Row(
@@ -304,6 +316,73 @@ private fun StartScreen(db: AppDatabase, modifier: Modifier, onStarted: (Workout
         }
     }
 }
+
+/** Rest-day cardio: minutes only, logged in two taps. Weekly total sits next to the button. */
+@Composable
+private fun CardioSection(db: AppDatabase) {
+    val scope = rememberCoroutineScope()
+    val entries by remember { db.cardioDao().all() }.collectAsStateList()
+    var open by remember { mutableStateOf(false) }
+    var kind by remember { mutableStateOf(CARDIO_KINDS.first()) }
+    var minutes by remember { mutableStateOf("30") }
+    var weekMinutes by remember { mutableStateOf(0) }
+
+    LaunchedEffect(entries) {
+        weekMinutes = db.cardioDao().minutesSince(now() - 7L * 24 * 60 * 60 * 1000)
+    }
+
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Log cardio") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        CARDIO_KINDS.forEach { k ->
+                            FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(k) })
+                        }
+                    }
+                    OutlinedTextField(
+                        value = minutes,
+                        onValueChange = { t -> minutes = t.filter { it.isDigit() }.take(3) },
+                        label = { Text("Minutes") },
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val m = minutes.toIntOrNull() ?: 0
+                    if (m > 0) scope.launch {
+                        db.cardioDao().upsert(Cardio(startedAt = now(), minutes = m, kind = kind))
+                        dev.dwm.liftlog.data.autoSync(db)
+                    }
+                    open = false
+                }) { Text("Log") }
+            },
+            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
+        )
+    }
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (weekMinutes > 0) "Cardio · $weekMinutes min this week" else "Cardio · none this week",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = { open = true }) { Text("+ Log cardio", color = Palette.Boost, fontWeight = FontWeight.Bold) }
+    }
+}
+
+// three actions share the card header — default TextButton padding makes them wrap on a phone
+private val tightButton = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 0.dp)
 
 @Composable
 private fun RecoveryChip(text: String, color: Color) {
@@ -584,7 +663,75 @@ private fun ProgramsSection(
             TextButton(onClick = { showTemplates = true }) { Text("+ Add Program") }
         }
         programs.forEach { program -> ProgramCard(db, program, startChecked, onStarted) }
+        PlanWizardCard(db)
         AiSuggestCard(db)
+    }
+}
+
+/** APS-style 3-question kickoff: goal, days/week, kit → a real program, built offline. */
+@Composable
+private fun PlanWizardCard(db: AppDatabase) {
+    val scope = rememberCoroutineScope()
+    var open by remember { mutableStateOf(false) }
+    var goal by remember { mutableStateOf(Goal.GROWTH) }
+    var days by remember { mutableStateOf(3) }
+    var homeKit by remember { mutableStateOf(false) }
+    var built by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(open) { if (open) homeKit = db.settingDao().get("equipmentKit") == "home" }
+
+    built?.let { name ->
+        AlertDialog(
+            onDismissRequest = { built = null },
+            confirmButton = { TextButton(onClick = { built = null }) { Text("Done") } },
+            title = { Text("Plan ready") },
+            text = { Text("$name added to your programs.\n\n$REST_DAY_ADVICE") },
+        )
+    }
+
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Build my plan") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Goal", style = MaterialTheme.typography.labelLarge)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Goal.entries.forEach { g ->
+                            FilterChip(selected = goal == g, onClick = { goal = g }, label = { Text(g.label) })
+                        }
+                    }
+                    Text("Days per week", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        (2..5).forEach { d ->
+                            FilterChip(selected = days == d, onClick = { days = d }, label = { Text("$d") })
+                        }
+                    }
+                    Text("Equipment", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(selected = !homeKit, onClick = { homeKit = false }, label = { Text("Full gym") })
+                        FilterChip(selected = homeKit, onClick = { homeKit = true }, label = { Text("My kit") })
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val kit = if (homeKit) Kit.HOME else Kit.ALL
+                    scope.launch {
+                        db.settingDao().put(Setting("equipmentKit", if (homeKit) "home" else "all"))
+                        val template = generatePlan(goal, days, kit)
+                        installTemplate(db, template)
+                        built = template.name
+                    }
+                    open = false
+                }) { Text("Build") }
+            },
+            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
+        )
+    }
+
+    OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+        Text("Build my plan")
     }
 }
 
@@ -723,6 +870,7 @@ fun ActiveWorkoutScreen(
     var editing by remember { mutableStateOf<Pair<String, SetField>?>(null) }
     var fresh by remember { mutableStateOf(true) }
     var historyFor by remember { mutableStateOf<Exercise?>(null) }
+    var swapFor by remember { mutableStateOf<Exercise?>(null) }
     var restPeeked by remember { mutableStateOf(false) }
     var tempoFor by remember { mutableStateOf<String?>(null) } // exerciseId with metronome running
 
@@ -777,6 +925,18 @@ fun ActiveWorkoutScreen(
     }
 
     historyFor?.let { ex -> ExerciseHistoryDialog(db, ex) { historyFor = null } }
+
+    swapFor?.let { ex ->
+        SwapExerciseDialog(db, ex, onDismiss = { swapFor = null }) { replacement ->
+            scope.launch {
+                // only the sets still to do move over — completed work stays on the original exercise
+                sets.filter { it.exerciseId == ex.id && !it.completed }.forEach { s ->
+                    db.workoutDao().updateSet(s.copy(exerciseId = replacement.id, updatedAt = now()))
+                }
+            }
+            swapFor = null
+        }
+    }
 
     summary?.let { s ->
         WorkoutCompleteDialog(s) {
@@ -880,6 +1040,9 @@ fun ActiveWorkoutScreen(
                     tempoOn = tempoFor == exerciseId,
                     onTempoToggle = { tempoFor = if (tempoFor == exerciseId) null else exerciseId },
                     onNameClick = { exercises[exerciseId]?.let { historyFor = it } },
+                    onSwap = { exercises[exerciseId]?.let { swapFor = it } },
+                    // programs already show their prescription; the hint means "routine bumped this"
+                    showProgressHint = workout.programDayId == null,
                     onEdit = { setId, field ->
                         editing = setId to field
                         fresh = true
@@ -986,6 +1149,44 @@ fun ActiveWorkoutScreen(
         RestTakeover(nextLabel) { restPeeked = true }
     }
     }
+}
+
+/** Same job, different equipment — alternatives scored by category and shared muscles. */
+@Composable
+private fun SwapExerciseDialog(
+    db: AppDatabase,
+    exercise: Exercise,
+    onDismiss: () -> Unit,
+    onPick: (Exercise) -> Unit,
+) {
+    var options by remember { mutableStateOf<List<Exercise>>(emptyList()) }
+    var homeOnly by remember { mutableStateOf(true) }
+    LaunchedEffect(exercise.id, homeOnly) {
+        options = swapCandidates(exercise, db.exerciseDao().allOnce(), if (homeOnly) Kit.HOME else Kit.ALL)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Swap ${exercise.name}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = homeOnly, onClick = { homeOnly = !homeOnly }, label = { Text("My kit only") })
+                if (options.isEmpty()) Text("No alternatives found.")
+                options.forEach { alt ->
+                    Column(
+                        Modifier.fillMaxWidth().clickable { onPick(alt) }.padding(vertical = 6.dp),
+                    ) {
+                        Text(alt.name, fontWeight = FontWeight.Bold)
+                        Text(
+                            listOf(alt.category, alt.equipment).filter { it.isNotBlank() }.joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -1168,6 +1369,8 @@ private fun ExerciseCard(
     tempoOn: Boolean,
     onTempoToggle: () -> Unit,
     onNameClick: () -> Unit,
+    onSwap: () -> Unit,
+    showProgressHint: Boolean,
     onEdit: (String, SetField) -> Unit,
     onComplete: (WorkoutSet) -> Unit,
     onDelete: (WorkoutSet) -> Unit,
@@ -1210,16 +1413,37 @@ private fun ExerciseCard(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         exercise?.name ?: "…",
-                        Modifier.clickable(onClick = onNameClick),
+                        Modifier.weight(1f).clickable(onClick = onNameClick),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                     if (supersetGroup != null) {
                         Text("SUPERSET", style = MaterialTheme.typography.labelSmall, color = Palette.Volt, fontWeight = FontWeight.Bold)
                     }
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onTempoToggle) {
+                    // routine progression bumped the prefill — say so, the numbers are still editable
+                    if (showProgressHint) {
+                        sets.firstOrNull { it.targetReps != null && !it.completed }?.let { s ->
+                            Text(
+                                "▲${s.targetReps}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Palette.Success,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                    exercise?.let { ex ->
+                        TextButton(onClick = { openUrl(demoVideoUrl(ex.name)) }, contentPadding = tightButton) {
+                            Text("▶", style = MaterialTheme.typography.titleMedium, color = Palette.Volt, fontWeight = FontWeight.Bold)
+                        }
+                        // glyphs, not words: three labelled buttons crowded the exercise name out
+                        TextButton(onClick = onSwap, contentPadding = tightButton) {
+                            Text("⇄", style = MaterialTheme.typography.titleMedium, color = Palette.Volt, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    TextButton(onClick = onTempoToggle, contentPadding = tightButton) {
                         Text(
                             if (tempoOn) "TEMPO ■" else "TEMPO ▶",
                             style = MaterialTheme.typography.labelSmall,

@@ -311,6 +311,7 @@ private suspend fun exportJson(db: AppDatabase): String {
         put("GroceryItem", enc(dev.dwm.liftlog.data.db.GroceryItem.serializer(), s.groceriesSince(0)))
         put("Routine", enc(dev.dwm.liftlog.data.db.Routine.serializer(), s.routinesSince(0)))
         put("RoutineExercise", enc(dev.dwm.liftlog.data.db.RoutineExercise.serializer(), s.routineExercisesSince(0)))
+        put("Cardio", enc(dev.dwm.liftlog.data.db.Cardio.serializer(), s.cardioSince(0)))
         // includes the AI key and sync token — this file is a full credential-bearing backup
         put("Setting", enc(dev.dwm.liftlog.data.db.Setting.serializer(), s.settingsSince(0)))
     }

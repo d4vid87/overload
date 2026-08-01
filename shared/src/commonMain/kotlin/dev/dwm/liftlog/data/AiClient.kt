@@ -112,6 +112,29 @@ class AiClient(
         }.getOrDefault(emptyList())
     }
 
+    /**
+     * A full day of meals hitting the macro targets, in the same JSON shape [parseFoods] returns —
+     * so the result renders and logs through the existing parsed-food path.
+     */
+    suspend fun mealPlan(goal: String, kcal: Double, protein: Double, carbs: Double, fat: Double): List<ParsedFood> {
+        val prompt = """
+            Plan one day of simple, cheap, home-cookable meals for a "$goal" goal.
+            Hit these daily targets as closely as you can: ${kcal.toInt()} kcal,
+            ${protein.toInt()}g protein, ${carbs.toInt()}g carbs, ${fat.toInt()}g fat.
+            Spread it across breakfast, lunch, dinner and one snack. Name each item plainly
+            (e.g. "Chicken breast", "Greek yogurt") and give a realistic portion in grams.
+            Reply with ONLY a JSON array, no prose:
+            [{"name": "...", "grams": <portion grams>, "kcal": <kcal for that portion>, "protein": <g>, "carbs": <g>, "fat": <g>}]
+        """.trimIndent()
+        val content = chat(prompt)
+        val start = content.indexOf('[')
+        val end = content.lastIndexOf(']')
+        if (start < 0 || end <= start) return emptyList()
+        return runCatching {
+            json.decodeFromString<List<ParsedFood>>(content.substring(start, end + 1))
+        }.getOrDefault(emptyList())
+    }
+
     suspend fun suggestWorkout(recentSummary: String): String = chat(
         """
         You are a strength coach. Based on my recent training below, suggest today's workout:

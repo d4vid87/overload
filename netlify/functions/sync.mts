@@ -3,7 +3,7 @@ import { getStore } from "@netlify/blobs";
 const TABLES = [
   "Exercise", "Workout", "WorkoutSet", "Program", "ProgramDay",
   "ProgramExercise", "Food", "FoodLog", "WeightEntry", "GroceryItem",
-  "Routine", "RoutineExercise",
+  "Routine", "RoutineExercise", "Cardio",
 ];
 
 export default async (req: Request) => {

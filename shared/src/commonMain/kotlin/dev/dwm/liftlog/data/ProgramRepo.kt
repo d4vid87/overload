@@ -42,15 +42,40 @@ suspend fun startProgramWorkout(db: AppDatabase, program: Program): Workout? {
     return workout
 }
 
+/** Top of the routine rep range: hit it on every set and the weight goes up next time. */
+const val ROUTINE_PROGRESS_REPS = 10
+const val ROUTINE_INCREMENT_KG = 2.5
+
+/** How to nudge the next session: [addKg] on top of each set's own weight, aiming at [targetReps]. */
+data class RoutineBump(val addKg: Double, val targetReps: Int)
+
+/**
+ * Double progression for routines, which otherwise just copied last session forever: if every
+ * completed set hit [ROUTINE_PROGRESS_REPS], add 2.5 kg and reset the target to 8; otherwise keep
+ * the weights and ask for one more rep. The bump is per set, so warm-up ramps stay ramps.
+ * Returns null when there is nothing to go on.
+ */
+fun routineSuggestion(previous: List<WorkoutSet>): RoutineBump? {
+    val done = previous.filter { it.completed && it.reps > 0 }
+    if (done.isEmpty()) return null
+    return if (done.all { it.reps >= ROUTINE_PROGRESS_REPS }) {
+        RoutineBump(ROUTINE_INCREMENT_KG, 8)
+    } else {
+        RoutineBump(0.0, done.minOf { it.reps } + 1)
+    }
+}
+
 /**
  * Strong-style routine start: sets are pre-filled from the exercise's previous
  * performance (weight/reps as uncompleted suggestions); no previous → empty sets.
+ * The prefill carries a progression target, so routines improve like programs do.
  */
 suspend fun startRoutineWorkout(db: AppDatabase, routine: dev.dwm.liftlog.data.db.Routine): Workout {
     val workout = Workout(name = routine.name, startedAt = nowMillis())
     db.workoutDao().insertWorkout(workout)
     for (re in db.routineDao().exercisesFor(routine.id)) {
         val previous = db.workoutDao().previousSets(re.exerciseId, workout.id)
+        val suggestion = routineSuggestion(previous)
         repeat(re.sets) { i ->
             val prev = previous.getOrNull(i)
             db.workoutDao().insertSet(
@@ -58,8 +83,9 @@ suspend fun startRoutineWorkout(db: AppDatabase, routine: dev.dwm.liftlog.data.d
                     workoutId = workout.id,
                     exerciseId = re.exerciseId,
                     setIndex = i,
-                    weightKg = prev?.weightKg ?: 0.0,
+                    weightKg = (prev?.weightKg ?: 0.0) + (if (prev != null) suggestion?.addKg ?: 0.0 else 0.0),
                     reps = prev?.reps ?: 0,
+                    targetReps = suggestion?.targetReps,
                 )
             )
         }
