@@ -29,6 +29,7 @@ android {
         targetSdk = 36
         versionCode = 15
         versionName = "0.10.0"
+        manifestPlaceholders["appLabel"] = "Overload"
     }
     // Stable release key. Previously `release` reused signingConfigs.debug, and CI generates a
     // fresh debug keystore on every run — so each release was signed with a DIFFERENT key, no
@@ -57,6 +58,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Local ADB previews can coexist with the user's release and its database.
+            if (providers.gradleProperty("overload.preview").orNull == "true") {
+                applicationIdSuffix = ".preview"
+                versionNameSuffix = "-preview"
+                manifestPlaceholders["appLabel"] = "Overload Preview"
+            }
+        }
         release {
             isMinifyEnabled = false
             signingConfig = if (hasReleaseKey) {

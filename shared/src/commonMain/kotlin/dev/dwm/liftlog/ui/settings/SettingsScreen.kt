@@ -82,9 +82,10 @@ fun SettingsScreen(
     }
 
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        dev.dwm.liftlog.ui.components.ScreenHeading("Your space", "Preferences, connections & your data.")
         if (uiScale != null && onUiScale != null) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

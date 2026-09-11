@@ -11,17 +11,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,9 +50,12 @@ import dev.dwm.liftlog.domain.computeTdee
 import dev.dwm.liftlog.domain.kgToLbDisplay
 import dev.dwm.liftlog.ui.Palette
 import dev.dwm.liftlog.ui.Tab
-import dev.dwm.liftlog.ui.components.FlatBar
-import dev.dwm.liftlog.ui.components.HeroNumber
-import dev.dwm.liftlog.ui.components.MacroBar
+import dev.dwm.liftlog.ui.components.TrainingHero
+import dev.dwm.liftlog.ui.components.MacroTile
+import androidx.compose.ui.unit.sp
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import dev.dwm.liftlog.ui.nutrition.todayEpochDay
 import dev.dwm.liftlog.ui.workout.clean
 import dev.dwm.liftlog.ui.collectAsStateList
@@ -81,7 +80,6 @@ fun DashboardScreen(
     var fatPct by remember { mutableStateOf(30.0) }
     var weights by remember { mutableStateOf<List<WeightEntry>>(emptyList()) }
     var intakes by remember { mutableStateOf<List<DayIntake>>(emptyList()) }
-    var fabOpen by remember { mutableStateOf(false) }
     var showRecovery by remember { mutableStateOf(false) }
     if (showRecovery) dev.dwm.liftlog.ui.workout.RecoveryScreen(db) { showRecovery = false }
     var workoutDays by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -119,7 +117,9 @@ fun DashboardScreen(
         // streak + week dots + recap + insights (all pure reads)
         val workouts = db.workoutDao().history().first()
         val dayMs = 86_400_000L
-        workoutDays = workouts.map { it.startedAt / dayMs }.toSet()
+        fun workoutDay(startedAt: Long) = Instant.fromEpochMilliseconds(startedAt)
+            .toLocalDateTime(TimeZone.currentSystemDefault()).date.toEpochDays().toLong()
+        workoutDays = workouts.map { workoutDay(it.startedAt) }.toSet()
         // consecutive weeks (ending this week) with ≥1 workout; weeks start Monday
         val thisWeek = (today + 3) / 7 // epochDay 0 = Thursday; +3 aligns Monday week boundaries
         val weeksTrained = workoutDays.map { (it + 3) / 7 }.toSet()
@@ -132,7 +132,7 @@ fun DashboardScreen(
         val dow = ((today + 3) % 7).toInt() // 0 = Monday
         if (dow <= 1) {
             val lastWeekStart = today - dow - 7
-            val lastWeek = workouts.filter { (it.startedAt / dayMs) in lastWeekStart until lastWeekStart + 7 }
+            val lastWeek = workouts.filter { workoutDay(it.startedAt) in lastWeekStart until lastWeekStart + 7 }
             if (lastWeek.isNotEmpty() || intakes.any { it.epochDay in lastWeekStart until lastWeekStart + 7 }) {
                 var volume = 0.0
                 for (w in lastWeek) {
@@ -189,90 +189,68 @@ fun DashboardScreen(
 
     Box(modifier.fillMaxSize()) {
         Column(
-            // extra bottom room so the FAB doesn't sit on top of the last card
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Today", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                if (streakWeeks > 0) {
-                    Row(
-                        Modifier.background(Palette.Boost.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "🔥 $streakWeeks week streak",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Palette.Boost,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
-            WeekDots(workoutDays, intakes.map { it.epochDay }.toSet(), today)
-            if (nextWorkoutName != null && onStartWorkout != null) {
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(Palette.Success, RoundedCornerShape(14.dp))
-                        .clickable(onClick = onStartWorkout)
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Text("OVERLOAD", style = MaterialTheme.typography.headlineMedium, letterSpacing = 1.sp)
+                    val date = kotlinx.datetime.LocalDate.fromEpochDays(today.toInt())
                     Text(
-                        "START ${nextWorkoutName!!.uppercase()}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black,
+                        "${date.dayOfWeek.name.take(3)} / ${date.month.name.take(3)} ${date.dayOfMonth}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text("→", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+            }
+            if (onStartWorkout != null) {
+                TrainingHero(
+                    title = "Build\nmomentum.",
+                    subtitle = nextWorkoutName?.let { "Up next · $it" } ?: "One session stronger. Keep showing up.",
+                    eyebrow = if (today in workoutDays) "Today's work. Done." else "Your next rep starts here",
+                    action = if (nextWorkoutName != null) "Start session" else "Explore your training",
+                    onClick = { if (nextWorkoutName != null) onStartWorkout() else onGoTo(Tab.Workout) },
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("THE LAST 7", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                    Text(if (streakWeeks > 0) "$streakWeeks week streak ↗" else "Every session counts", style = MaterialTheme.typography.labelSmall, color = Palette.Success)
                 }
+                WeekDots(workoutDays, intakes.map { it.epochDay }.toSet(), today)
             }
             recap?.let { WeeklyRecapCard(it) }
-            // hero: one big number + macro bars, flat
-            Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                HeroNumber((targetKcal - kcal).toInt(), "kcal left", Palette.Calories, Modifier.fillMaxWidth())
-                FlatBar((kcal / targetKcal).toFloat(), Palette.Calories)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    LabeledValue("Target", "${targetKcal.toInt()}")
-                    LabeledValue("Food", "${kcal.toInt()}")
-                    tdee?.let { LabeledValue("Burn", "~${it.tdeeKcal.toInt()}") }
+            Card(Modifier.fillMaxWidth()) {
+              Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("DAILY FUEL", style = MaterialTheme.typography.headlineSmall)
+                    TextButton(onClick = { onGoTo(Tab.Nutrition) }) { Text("Log food ↗") }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("${kotlin.math.abs((targetKcal - kcal).toInt())}", style = MaterialTheme.typography.displayMedium)
+                            Text(if (kcal > targetKcal) "kcal over" else "kcal left", Modifier.padding(bottom = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("${kcal.toInt()} eaten / ${targetKcal.toInt()} target", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 val carbsPct = (100.0 - proteinPct - fatPct).coerceAtLeast(0.0)
-                MacroBar("Protein", protein, targetKcal * proteinPct / 100 / 4, Palette.Protein)
-                MacroBar("Carbs", carbs, targetKcal * carbsPct / 100 / 4, Palette.Carbs)
-                MacroBar("Fat", fat, targetKcal * fatPct / 100 / 9, Palette.Fat)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MacroTile("Protein", protein, targetKcal * proteinPct / 100 / 4, Palette.Protein, Modifier.weight(1f))
+                    MacroTile("Carbs", carbs, targetKcal * carbsPct / 100 / 4, Palette.Carbs, Modifier.weight(1f))
+                    MacroTile("Fat", fat, targetKcal * fatPct / 100 / 9, Palette.Fat, Modifier.weight(1f))
+                }
+              }
             }
             if (insights.isNotEmpty()) InsightsCard(insights)
             WeightTrendCard(weights, today)
             ExpenditureCard(intakes, tdee, today)
             dev.dwm.liftlog.ui.workout.RecoveryCard(db, onOpen = { showRecovery = true })
         }
-        Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-            FloatingActionButton(onClick = { fabOpen = true }, containerColor = Palette.Calories) {
-                Icon(Icons.Default.Add, "quick actions")
-            }
-            DropdownMenu(expanded = fabOpen, onDismissRequest = { fabOpen = false }) {
-                DropdownMenuItem(text = { Text("Log Food") }, onClick = { fabOpen = false; onGoTo(Tab.Nutrition) })
-                DropdownMenuItem(text = { Text("Snap Food Photo (AI)") }, onClick = { fabOpen = false; onGoTo(Tab.Nutrition) })
-                DropdownMenuItem(text = { Text("Start Workout") }, onClick = { fabOpen = false; onGoTo(Tab.Workout) })
-                DropdownMenuItem(text = { Text("Log Weight") }, onClick = { fabOpen = false; onGoTo(Tab.Nutrition) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun LabeledValue(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -300,32 +278,27 @@ private fun RecapStat(value: String, label: String) {
     }
 }
 
-/** 7-day dot row: filled green = trained, cyan ring = food logged, dim = nothing. */
+/** Calendar strip: today is highlighted; the marker records training or food logging. */
 @Composable
 private fun WeekDots(workoutDays: Set<Long>, loggedDays: Set<Long>, today: Long) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ((today - 6)..today).forEach { day ->
             val trained = day in workoutDays
             val logged = day in loggedDays
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    Modifier.size(26.dp).background(
-                        when {
-                            trained -> Palette.Success
-                            logged -> Palette.Volt.copy(alpha = 0.35f)
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        androidx.compose.foundation.shape.CircleShape,
-                    ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (trained) Text("✓", color = Color.Black, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                }
+            val current = day == today
+            val ink = if (current) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            Column(
+                Modifier.weight(1f).background(if (current) Palette.Success else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp)).padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
                     dashDayLetter(day),
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (day == today) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = ink.copy(alpha = 0.65f),
                 )
+                Text("${kotlinx.datetime.LocalDate.fromEpochDays(day.toInt()).dayOfMonth}", style = MaterialTheme.typography.titleMedium, color = ink)
+                Box(Modifier.size(4.dp).background(if (trained) ink else if (logged) Palette.Volt else Color.Transparent, androidx.compose.foundation.shape.CircleShape))
             }
         }
     }
@@ -366,7 +339,7 @@ private fun RangeChips(selected: Long, onSelect: (Long) -> Unit) {
                         RoundedCornerShape(16.dp),
                     )
                     .clickable { onSelect(days) }
-                    .padding(vertical = 6.dp),
+                    .heightIn(min = 48.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

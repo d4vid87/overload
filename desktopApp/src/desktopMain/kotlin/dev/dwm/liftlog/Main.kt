@@ -60,7 +60,7 @@ fun main() {
                     saveExport = { content ->
                         val file = java.io.File(
                             System.getProperty("user.home"),
-                            "liftlog-export-${System.currentTimeMillis()}.json",
+                            "overload-export-${System.currentTimeMillis()}.json",
                         )
                         file.writeText(content)
                         file.absolutePath

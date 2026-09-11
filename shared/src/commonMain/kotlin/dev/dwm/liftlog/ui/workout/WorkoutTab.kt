@@ -245,8 +245,8 @@ private fun StartScreen(db: AppDatabase, modifier: Modifier, onStarted: (Workout
     }
 
     LazyColumn(
-        modifier.fillMaxSize().padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             Row(
@@ -254,7 +254,7 @@ private fun StartScreen(db: AppDatabase, modifier: Modifier, onStarted: (Workout
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Train", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                dev.dwm.liftlog.ui.components.ScreenHeading("Train", "Make every session count.", Modifier.weight(1f))
                 TextButton(onClick = {
                     scope.launch {
                         val w = Workout(name = "Workout", startedAt = now())
@@ -745,6 +745,21 @@ private fun ProgramCard(
     val scope = rememberCoroutineScope()
     var days by remember { mutableStateOf<List<ProgramDay>>(emptyList()) }
     var dayMuscles by remember { mutableStateOf<List<Muscle>>(emptyList()) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Remove program?") },
+            text = { Text("Remove ${program.name} from your training plans? Completed workouts stay in your history.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    scope.launch { db.programDao().deleteProgram(program.id) }
+                }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Keep program") } },
+        )
+    }
     LaunchedEffect(program.id, program.currentDayIndex) {
         days = db.programDao().daysFor(program.id)
         dayMuscles = musclesForProgramDay(db, program)
@@ -753,51 +768,14 @@ private fun ProgramCard(
     val dayNum = (program.currentDayIndex % n) + 1
     val today = days.getOrNull(program.currentDayIndex % n)
 
-    // hero START block: whole card is one tap to start
-    Box(
-        Modifier.fillMaxWidth()
-            .background(
-                androidx.compose.ui.graphics.Brush.horizontalGradient(
-                    listOf(Color(0xFF00E676), Color(0xFF00B0FF)),
-                ),
-                RoundedCornerShape(20.dp),
-            )
-            .clickable {
-                startChecked(dayMuscles) { scope.launch { startProgramWorkout(db, program)?.let(onStarted) } }
-            }
-            .padding(20.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "START",
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black.copy(alpha = 0.65f),
-                )
-                IconButton(onClick = { scope.launch { db.programDao().deleteProgram(program.id) } }, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, "delete program", tint = Color.Black.copy(alpha = 0.45f))
-                }
-            }
-            Text(
-                (today?.name ?: "Workout").uppercase(),
-                style = MaterialTheme.typography.displaySmall,
-                color = Color.Black,
-            )
-            Text(
-                "${program.name} · Day $dayNum of ${days.size}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.Black.copy(alpha = 0.65f),
-            )
-            LinearProgressIndicator(
-                progress = { dayNum / n.toFloat() },
-                color = Color.Black,
-                trackColor = Color.Black.copy(alpha = 0.2f),
-                modifier = Modifier.fillMaxWidth().height(6.dp),
-            )
-        }
-    }
+    dev.dwm.liftlog.ui.components.TrainingHero(
+        title = today?.name?.let { if (it.length <= 2) "Session $it" else it } ?: "Your workout",
+        subtitle = program.name,
+        eyebrow = "Your program / Day $dayNum of ${days.size}",
+        action = "Start this session",
+        onClick = { startChecked(dayMuscles) { scope.launch { startProgramWorkout(db, program)?.let(onStarted) } } },
+        onDelete = { confirmDelete = true },
+    )
 }
 
 @Composable
@@ -1235,13 +1213,13 @@ private fun WorkoutHeader(workout: Workout, onFinish: () -> Unit, onDiscard: () 
             Modifier
                 .background(
                     androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        listOf(Color(0xFF4CAF50), Color(0xFF2FB86A), Color(0xFF1E9E86))
+                        listOf(Palette.Success, Palette.Success)
                     ),
                     RoundedCornerShape(12.dp),
                 )
                 .clickable(onClick = onFinish)
                 .padding(horizontal = 22.dp, vertical = 12.dp),
-        ) { Text("Finish", fontWeight = FontWeight.Bold, color = Color.White) }
+        ) { Text("Finish", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary) }
     }
 }
 

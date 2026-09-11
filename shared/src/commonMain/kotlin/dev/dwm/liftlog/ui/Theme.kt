@@ -3,61 +3,97 @@ package dev.dwm.liftlog.ui
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import org.jetbrains.compose.resources.Font
+import overload.shared.generated.resources.Res
+import overload.shared.generated.resources.barlow_condensed_bold
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 
-// Overload neon-athletic palette: dark navy base, electric accents
+// Editorial sportswear: ink, chalk, acid yellow, and violet data accents.
 object Palette {
-    val Success = Color(0xFF00E676) // completed sets, finish button — electric green
-    val Protein = Color(0xFFFF8A50)
-    val Fat = Color(0xFFFFD54F)
-    val Carbs = Color(0xFFC6FF00)
-    val Calories = Color(0xFF40C4FF)
-    val Pr = Color(0xFFFFD740)
-    val Boost = Color(0xFF00E676)  // workout accents — electric green
-    val Volt = Color(0xFF22D3EE)   // cyan secondary accent
-    val Trend = Color(0xFF9B8CFF)  // MacroFactor purple — trend lines
+    val Success = Color(0xFFD9FF70)
+    val Protein = Color(0xFFE8AD94)
+    val Fat = Color(0xFFE5CD91)
+    val Carbs = Color(0xFFABBCE8)
+    val Calories = Color(0xFFD9FF70)
+    val Pr = Color(0xFFE5CD91)
+    val Boost = Success
+    val Volt = Color(0xFFBDB4FF)
+    val Trend = Color(0xFFB8ADF0)
 }
 
 private val Scheme = darkColorScheme(
-    primary = Color(0xFF00E676),
-    onPrimary = Color(0xFF00310F),
-    secondary = Color(0xFF22D3EE),
-    onSecondary = Color(0xFF002B33),
-    background = Color(0xFF0A0E14),
-    surface = Color(0xFF111826),
-    surfaceVariant = Color(0xFF1C2536),
-    surfaceContainer = Color(0xFF141C2B),
-    surfaceContainerHigh = Color(0xFF1C2536),
-    onSurface = Color(0xFFE9EDF5),
-    onSurfaceVariant = Color(0xFF93A0B4),
-    onBackground = Color(0xFFE9EDF5),
-    outline = Color(0xFF2E3A50),
+    primary = Palette.Success,
+    onPrimary = Color(0xFF182006),
+    primaryContainer = Color(0xFF29311C),
+    onPrimaryContainer = Palette.Success,
+    secondary = Palette.Volt,
+    onSecondary = Color(0xFF102B32),
+    secondaryContainer = Color(0xFF2D3422),
+    onSecondaryContainer = Palette.Success,
+    tertiary = Palette.Trend,
+    background = Color(0xFF0D0E11),
+    surface = Color(0xFF141519),
+    surfaceDim = Color(0xFF0D0E11),
+    surfaceBright = Color(0xFF303940),
+    surfaceVariant = Color(0xFF33363F),
+    surfaceContainerLowest = Color(0xFF0B0F12),
+    surfaceContainerLow = Color(0xFF171E23),
+    surfaceContainer = Color(0xFF1B2329),
+    surfaceContainerHigh = Color(0xFF232C32),
+    surfaceContainerHighest = Color(0xFF1B1D23),
+    onSurface = Color(0xFFF0F3F1),
+    onSurfaceVariant = Color(0xFFA6A7B2),
+    onBackground = Color(0xFFF0F3F1),
+    outline = Color(0xFF52616A),
+    outlineVariant = Color(0xFF2B363D),
 )
 
 // numbers are the hero: heavier display/headline weights, tighter labels
 private val OverloadTypography = Typography().run {
     copy(
-        displayLarge = displayLarge.copy(fontWeight = FontWeight.ExtraBold),
-        displayMedium = displayMedium.copy(fontWeight = FontWeight.ExtraBold),
-        displaySmall = displaySmall.copy(fontWeight = FontWeight.ExtraBold),
-        headlineLarge = headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
-        headlineMedium = headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+        displayLarge = displayLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-2).sp),
+        displayMedium = displayMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp),
+        displaySmall = displaySmall.copy(fontWeight = FontWeight.SemiBold),
+        headlineLarge = headlineLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp),
+        headlineMedium = headlineMedium.copy(fontWeight = FontWeight.SemiBold),
         headlineSmall = headlineSmall.copy(fontWeight = FontWeight.Bold),
         titleLarge = titleLarge.copy(fontWeight = FontWeight.Bold),
         titleMedium = titleMedium.copy(fontWeight = FontWeight.Bold),
-        labelMedium = labelMedium.copy(letterSpacing = 0.8.sp),
-        labelSmall = labelSmall.copy(letterSpacing = 0.8.sp),
+        labelMedium = labelMedium.copy(letterSpacing = 0.2.sp),
+        labelSmall = labelSmall.copy(letterSpacing = 0.3.sp),
     )
 }
 
 @Composable
 fun LiftLogTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Scheme, typography = OverloadTypography) {
+    val display = FontFamily(Font(Res.font.barlow_condensed_bold, FontWeight.Bold))
+    MaterialTheme(
+        colorScheme = Scheme,
+        typography = OverloadTypography.run {
+            copy(
+                displayLarge = displayLarge.copy(fontFamily = display, fontSize = 64.sp, letterSpacing = (-1).sp),
+                displayMedium = displayMedium.copy(fontFamily = display, fontSize = 52.sp),
+                displaySmall = displaySmall.copy(fontFamily = display, fontSize = 40.sp),
+                headlineLarge = headlineLarge.copy(fontFamily = display, fontSize = 40.sp, letterSpacing = 0.sp),
+                headlineMedium = headlineMedium.copy(fontFamily = display, fontSize = 32.sp),
+                headlineSmall = headlineSmall.copy(fontFamily = display, fontSize = 28.sp),
+            )
+        },
+        shapes = Shapes(
+            extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(12.dp),
+            medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(20.dp),
+            extraLarge = RoundedCornerShape(24.dp),
+        ),
+    ) {
         // Scaffold/Box use containerColor=Transparent, and contentColorFor(Transparent) is
         // Unspecified — which Text renders as BLACK on our dark background. Every heading outside
         // a Card was invisible until this. Cards override it themselves with onSurface.

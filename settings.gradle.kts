@@ -1,4 +1,4 @@
-rootProject.name = "liftlog"
+rootProject.name = "overload"
 
 pluginManagement {
     repositories {

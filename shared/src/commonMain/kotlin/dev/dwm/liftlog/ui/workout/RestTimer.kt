@@ -21,7 +21,7 @@ object RestTimer {
         private set
 
     fun start(seconds: Int) {
-        durationMs = seconds * 1000L
+        durationMs = seconds.coerceAtLeast(1) * 1000L
         endsAt = nowMillis() + durationMs
         over = false
         notifyRest(endsAt)
@@ -32,6 +32,7 @@ object RestTimer {
         val newEnd = (e + seconds * 1000L).coerceAtLeast(nowMillis())
         durationMs = (durationMs + seconds * 1000L).coerceAtLeast(1000L)
         endsAt = newEnd
+        over = false
         notifyRest(newEnd)
     }
 

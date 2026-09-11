@@ -63,6 +63,7 @@ import kotlinx.datetime.toLocalDateTime
 fun HistoryScreen(db: AppDatabase, modifier: Modifier = Modifier) {
     var tab by remember { mutableStateOf(0) }
     Column(modifier.fillMaxSize()) {
+        dev.dwm.liftlog.ui.components.ScreenHeading("Progress", "Every session adds up.", Modifier.padding(20.dp))
         TabRow(selectedTabIndex = tab) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("History") })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Calendar") })
@@ -95,9 +96,20 @@ private fun WorkoutList(db: AppDatabase) {
             .sortedByDescending { it.first }
     }
     LazyColumn(
-        Modifier.padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        if (entries.isEmpty()) {
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.FitnessCenter, null, tint = Palette.Success)
+                        Text("Your story starts here", style = MaterialTheme.typography.titleMedium)
+                        Text("Complete a workout or log cardio in Train. Your sessions will appear here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
         items(
             entries,
             key = { (_, e) -> if (e is Workout) e.id else (e as dev.dwm.liftlog.data.db.Cardio).id },

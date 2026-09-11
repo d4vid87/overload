@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -40,10 +43,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -62,8 +65,8 @@ import dev.dwm.liftlog.ui.workout.WorkoutTab
 import kotlinx.coroutines.delay
 
 enum class Tab(val label: String, val icon: ImageVector) {
-    Dashboard("Dashboard", Icons.Default.Dashboard),
-    Workout("Workout", Icons.Default.FitnessCenter),
+    Dashboard("Today", Icons.Default.Dashboard),
+    Workout("Train", Icons.Default.FitnessCenter),
     Nutrition("Food", Icons.Default.Restaurant),
     History("History", Icons.Default.History),
     Settings("More", Icons.Default.Settings),
@@ -81,10 +84,11 @@ fun App(
     onUiScale: ((Float) -> Unit)? = null,
 ) {
     val off = remember { OpenFoodFacts(httpClient()) }
-    var tab by remember { mutableStateOf(Tab.Dashboard) }
+    var tab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
     var workoutRefresh by remember { mutableIntStateOf(0) }
     var onboarded by remember { mutableStateOf<Boolean?>(null) }
     var pendingQuickStart by remember { mutableStateOf(false) }
+    var timerRestored by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         seedExercisesIfEmpty(db)
@@ -94,9 +98,12 @@ fun App(
         if (savedEnd != null) {
             RestTimer.restore(savedEnd, db.settingDao().get("restDurationMs")?.toLongOrNull() ?: 90_000L)
         }
+        timerRestored = true
+        dev.dwm.liftlog.ui.workout.WorkoutSession.active = db.workoutDao().activeWorkout() != null
         dev.dwm.liftlog.data.autoSync(db) // pull other devices' changes on open
     }
-    LaunchedEffect(RestTimer.endsAt) {
+    LaunchedEffect(timerRestored, RestTimer.endsAt) {
+        if (!timerRestored) return@LaunchedEffect
         val e = RestTimer.endsAt
         db.settingDao().put(dev.dwm.liftlog.data.db.Setting("restEndsAt", e?.toString() ?: ""))
         if (e != null) {
@@ -120,9 +127,6 @@ fun App(
         if (onboarded == false) {
             dev.dwm.liftlog.ui.onboarding.OnboardingWizard(db) { onboarded = true }
         }
-        val bg = Brush.verticalGradient(
-            listOf(Color(0xFF0D1524), MaterialTheme.colorScheme.background),
-        )
         @Composable
         fun content(modifier: Modifier) {
             when (tab) {
@@ -148,7 +152,7 @@ fun App(
             }
         }
 
-        BoxWithConstraints(Modifier.fillMaxSize().background(bg)) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             if (maxWidth >= 840.dp) {
                 // desktop / wide: side rail + centered column so cards don't stretch
                 Row(Modifier.fillMaxSize()) {
@@ -178,7 +182,8 @@ fun App(
                     bottomBar = {
                         Column {
                             if (tab != Tab.Workout) GlobalRestBar()
-                            NavigationBar {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                                 Tab.entries.forEach { t ->
                                     NavigationBarItem(
                                         selected = tab == t,
@@ -186,8 +191,16 @@ fun App(
                                             if (t == Tab.Workout) workoutRefresh++
                                             tab = t
                                         },
-                                        icon = { Icon(t.icon, null) },
-                                        label = { Text(t.label) },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            indicatorColor = Color.Transparent,
+                                            selectedTextColor = Palette.Success,
+                                        ),
+                                        icon = {
+                                            Box(Modifier.background(if (tab == t) Palette.Success else Color.Transparent, RoundedCornerShape(10.dp)).padding(7.dp)) {
+                                                Icon(t.icon, null, Modifier.size(20.dp), tint = if (tab == t) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        },
+                                        label = { Text(t.label.uppercase(), style = MaterialTheme.typography.labelSmall) },
                                     )
                                 }
                             }

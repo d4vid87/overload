@@ -4,7 +4,7 @@ import dev.dwm.liftlog.data.db.AppDatabase
 import dev.dwm.liftlog.data.db.Exercise
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import liftlog.shared.generated.resources.Res
+import overload.shared.generated.resources.Res
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 
 @Serializable

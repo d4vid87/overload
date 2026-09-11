@@ -3,7 +3,7 @@
     <uses-feature android:name="android.hardware.type.watch" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
-        android:label="LiftLog"
+        android:label="Overload"
         android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.DeviceDefault">
         <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />

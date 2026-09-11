@@ -60,7 +60,7 @@ import dev.dwm.liftlog.ui.CapturedPhoto
 import dev.dwm.liftlog.ui.Palette
 import dev.dwm.liftlog.ui.components.FlatBar
 import dev.dwm.liftlog.ui.components.HeroNumber
-import dev.dwm.liftlog.ui.components.MacroBar
+import dev.dwm.liftlog.ui.components.MacroTile
 import dev.dwm.liftlog.data.db.DailyMacro
 import dev.dwm.liftlog.data.db.GroceryItem
 import dev.dwm.liftlog.data.AiClient
@@ -248,7 +248,7 @@ fun NutritionScreen(
 
     LazyColumn(
         modifier.fillMaxSize()
-            .padding(12.dp)
+            .padding(horizontal = 20.dp, vertical = 16.dp)
             // swipe left/right to move between days
             .pointerInput(Unit) {
                 var drag = 0f
@@ -260,8 +260,9 @@ fun NutritionScreen(
                     },
                 )
             },
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        item { dev.dwm.liftlog.ui.components.ScreenHeading("Nourish", "Fuel your training. Find your balance.") }
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { day-- }) { Text("◀") }
@@ -332,14 +333,16 @@ fun NutritionScreen(
             }
         }
         item {
-            // hero: one big number leads the screen
-            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                HeroNumber((targetKcal - kcal).toInt(), "kcal left", Palette.Calories, Modifier.fillMaxWidth())
+            Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                HeroNumber(kotlin.math.abs((targetKcal - kcal).toInt()), if (kcal > targetKcal) "kcal over target" else "kcal remaining", Palette.Calories, Modifier.fillMaxWidth())
                 FlatBar((kcal / targetKcal).toFloat(), Palette.Calories)
                 val carbsPct = (100.0 - proteinPct - fatPct).coerceAtLeast(0.0)
-                MacroBar("Protein", protein, targetKcal * proteinPct / 100 / 4, Palette.Protein)
-                MacroBar("Carbs", carbs, targetKcal * carbsPct / 100 / 4, Palette.Carbs)
-                MacroBar("Fat", fat, targetKcal * fatPct / 100 / 9, Palette.Fat)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MacroTile("Protein", protein, targetKcal * proteinPct / 100 / 4, Palette.Protein, Modifier.weight(1f))
+                    MacroTile("Carbs", carbs, targetKcal * carbsPct / 100 / 4, Palette.Carbs, Modifier.weight(1f))
+                    MacroTile("Fat", fat, targetKcal * fatPct / 100 / 9, Palette.Fat, Modifier.weight(1f))
+                }
                 tdee?.let { t ->
                     Text(
                         "Expenditure ~${t.tdeeKcal.toInt()} kcal · target ${t.targetKcal.toInt()} · " +
@@ -352,6 +355,7 @@ fun NutritionScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
             }
         }
         if (aiKeyMissing) {

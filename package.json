@@ -1,5 +1,5 @@
 {
-  "name": "liftlog-sync",
+  "name": "overload-sync",
   "private": true,
   "dependencies": {
     "@netlify/blobs": "^8.1.0"

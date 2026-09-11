@@ -15,5 +15,5 @@ jobs:
       - run: ./gradlew testDebugUnitTest :androidApp:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: liftlog-debug-apk
+          name: overload-debug-apk
           path: androidApp/build/outputs/apk/debug/*.apk

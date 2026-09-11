@@ -71,7 +71,7 @@ class OpenFoodFacts(engineClient: HttpClient) {
 
     suspend fun search(query: String): List<Food> = runCatching {
         client.get("https://world.openfoodfacts.org/cgi/search.pl") {
-            header("User-Agent", "LiftLog/0.1 (personal app)")
+            header("User-Agent", "Overload/0.10 (personal app)")
             parameter("search_terms", query)
             parameter("search_simple", 1)
             parameter("action", "process")
@@ -89,7 +89,7 @@ class OpenFoodFacts(engineClient: HttpClient) {
     suspend fun submitProduct(food: Food, user: String, password: String): Boolean = runCatching {
         val code = food.barcode ?: return false
         client.get("https://world.openfoodfacts.org/cgi/product_jqm2.pl") {
-            header("User-Agent", "LiftLog/0.1 (personal app)")
+            header("User-Agent", "Overload/0.10 (personal app)")
             parameter("code", code)
             parameter("user_id", user)
             parameter("password", password)
@@ -105,7 +105,7 @@ class OpenFoodFacts(engineClient: HttpClient) {
 
     suspend fun byBarcode(barcode: String): Food? = runCatching {
         val resp = client.get("https://world.openfoodfacts.org/api/v2/product/$barcode.json") {
-            header("User-Agent", "LiftLog/0.1 (personal app)")
+            header("User-Agent", "Overload/0.10 (personal app)")
         }.body<OffProductResponse>()
         if (resp.status == 1) resp.product?.toFood() else null
     }.getOrNull()
