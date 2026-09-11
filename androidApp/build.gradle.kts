@@ -27,8 +27,8 @@ android {
         applicationId = "dev.dwm.liftlog"
         minSdk = 31
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.10.0"
+        versionCode = 16
+        versionName = "0.11.0"
         manifestPlaceholders["appLabel"] = "Overload"
     }
     // Stable release key. Previously `release` reused signingConfigs.debug, and CI generates a
